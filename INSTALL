@@ -1,6 +1,0 @@
-
-export CTARTA=<local>
-
-make install prefix=$CTARTA
-
-
