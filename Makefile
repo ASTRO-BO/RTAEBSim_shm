@@ -20,10 +20,10 @@ SHELL = /bin/sh
 
 ####### 1) Project names and system
 
-#SYSTEM: linux or QNX
-SYSTEM = linux
-PROJECT= RTAEBsim_socket
-EXE_NAME = RTAEBsim_socket
+SYSTEM = $(shell gcc -dumpmachine)
+PROJECT = RTAEBsim_shm
+CLIENT_NAME = RTAEBsim_client
+SERVER_NAME = RTAEBsim_server
 LIB_NAME = 
 VER_FILE_NAME = version.h
 #the name of the directory where the conf file are copied (into $(datadir))
@@ -81,6 +81,9 @@ LIBS = $(INCPATH) -lstdc++ -lRTAtelem  -lpacket
 ifeq ($(SYSTEM), QNX)
 	LIBS += -lsocket
 endif
+ifneq (, $(findstring linux, $(SYSTEM)))
+        LIBS += -pthread -lrt
+endif
 LINK     = g++
 #for link
 LFLAGS = -shared -Wl,-soname,$(TARGET1) -Wl,-rpath,$(DESTDIR)
@@ -130,7 +133,7 @@ $(shell  cut $(INCLUDE_DIR)/$(VER_FILE_NAME) -f 3 > version)
 ####### 9) Pattern rules
 
 %.o : %.cpp
-	$(CC) $(CPPFLAGS) $(ALL_CFLAGS) -c $< -o $(OBJECTS_DIR)/$@
+	$(CXX) $(CPPFLAGS) $(ALL_CFLAGS) -c $< -o $(OBJECTS_DIR)/$@
 
 %.o : %.c
 	$(CC) $(CPPFLAGS) $(ALL_CFLAGS) -c $< -o $(OBJECTS_DIR)/$@
@@ -145,16 +148,20 @@ $(DOXY_SOURCE_DIR)/%.cpp : %.cpp
 ####### 10) Build rules
 
 #all: compile the entire program.
-all: exe
+all: client server
 		#only if conf directory is present:
 		#$(SYMLINK) $(CONF_DIR) $(CONF_DEST_DIR)
 
 lib: staticlib 
 	
-exe: makeobjdir $(OBJECTS)
+client: makeobjdir client.o
 		test -d $(EXE_DESTDIR) || mkdir -p $(EXE_DESTDIR)
-		$(CC) $(CPPFLAGS) $(ALL_CFLAGS) -o $(EXE_DESTDIR)/$(EXE_NAME) $(OBJECTS_DIR)/*.o $(LIBS)
-	
+		$(CC) $(CPPFLAGS) $(ALL_CFLAGS) -o $(EXE_DESTDIR)/$(CLIENT_NAME) $(OBJECTS_DIR)/client.o $(LIBS)
+
+server: makeobjdir server.o
+		test -d $(EXE_DESTDIR) || mkdir -p $(EXE_DESTDIR)
+		$(CC) $(CPPFLAGS) $(ALL_CFLAGS) -o $(EXE_DESTDIR)/$(SERVER_NAME) $(OBJECTS_DIR)/server.o $(LIBS)
+
 staticlib: makelibdir makeobjdir $(OBJECTS)	
 		test -d $(LIB_DESTDIR) || mkdir -p $(LIB_DESTDIR)	
 		$(DEL_FILE) $(LIB_DESTDIR)/$(TARGETA) 	
@@ -184,7 +191,8 @@ clean:
 	$(DEL_FILE) *~ core *.core
 	$(DEL_FILE) $(LIB_DESTDIR)/*.a
 	$(DEL_FILE) $(LIB_DESTDIR)/*.so*
-	$(DEL_FILE) $(EXE_DESTDIR)/$(EXE_NAME)	
+	$(DEL_FILE) $(EXE_DESTDIR)/$(CLIENT_NAME)
+	$(DEL_FILE) $(EXE_DESTDIR)/$(SERVER_NAME)
 	$(DEL_FILE) version
 	$(DEL_FILE) prefix
 	$(DEL_FILE) $(PROJECT).dvi
@@ -219,7 +227,8 @@ install: all
 	
 	# For exe installation
 	test -d $(bindir) || mkdir -p $(bindir)	
-	$(COPY_FILE) $(EXE_DESTDIR)/$(EXE_NAME) $(bindir)
+	$(COPY_FILE) $(EXE_DESTDIR)/$(CLIENT_NAME) $(bindir)
+	$(COPY_FILE) $(EXE_DESTDIR)/$(SERVER_NAME) $(bindir)
 	#copy icon
 	#test -d $(icondir) || mkdir -p $(icondir)
 	#$(COPY_FILE) $(ICON_DIR)/$(ICON_NAME) $(icondir)
@@ -239,7 +248,8 @@ uninstall:
 	$(DEL_FILE) $(addprefix $(includedir)/, $(notdir $(INCLUDE)))
 	
 	# For exe uninstall
-	$(DEL_FILE) $(bindir)/$(EXE_NAME)
+	$(DEL_FILE) $(bindir)/$(CLIENT_NAME)
+	$(DEL_FILE) $(bindir)/$(SERVER_NAME)
 	#$(DEL_FILE) $(icondir)/$(ICON_NAME)
 	
 #dist: create a distribution tar file for this program
