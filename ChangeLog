@@ -1,0 +1,14 @@
+2013-09-17 Andrea Bulgarelli <bulgarelli@iasfbo.inaf.it>
+
+* Use of CTAPacket.h (CTAPacket): dword getInputPacketDimension(byte* stream)
+
+2013-09-12 Andrea Bulgarelli <bulgarelli@iasfbo.inaf.it>
+TAG v1.0.1
+
+* CTARTA env var management
+
+2013-09-11 Andrea Bulgarelli <bulgarelli@iasfbo.inaf.it>
+TAG v1.0.0
+
+* first version that decode CTA PROD-2 data
+
