@@ -1,0 +1,10 @@
+A simple test for shm performances using a memcpy.
+
+To build the project simply run:
+ $ make
+
+Run the client:
+ $ ./RTAEBsim_client
+
+Run the server:
+ $ ./RTAEBsim_server
