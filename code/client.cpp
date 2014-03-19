@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 
 	// Create a virtual memory from the shm (of key shmKey)
 	key_t key = shmKey;
-	int shmid = shmget(key, shmSize, 0666);
+	int shmid = shmget(key, shmSize, IPC_CREAT | 0666);
 	if (shmid < 0) {
 		cerr << "Failure in shmget" << endl;
 		return 0;
