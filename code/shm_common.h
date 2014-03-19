@@ -1,6 +1,4 @@
-#define PACKETSZ 128000
-#define NPACKETS 1000000
-#define SHMSZ PACKETSZ*NPACKETS
-char SEM_NAME[]= "sema1";
-char SYNC_SEM_NAME[]= "sema2";
-
+const int shmSize = 128000;
+const int shmKey = 111;
+const char semFullName[]= "sema1";
+const char semEmptyName[]= "sema2";

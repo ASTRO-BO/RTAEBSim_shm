@@ -14,84 +14,227 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <semaphore.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
 #include "shm_common.h"
 
-int main() {
-	int i;
-	int shmid;
-	key_t key;
-	unsigned char *shm;
-	sem_t *mutex, *mutexsync;
-	unsigned char vec[PACKETSZ];
+// shm
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
-	//name the shared memory segment
-	key = 111;
+// semaphore
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 
-	//create & initialize existing semaphore
-	mutex = sem_open(SEM_NAME, 0, 0644, 0);
-	if (mutex == SEM_FAILED) {
-		perror("reader:unable to execute semaphore");
-		sem_close(mutex);
-		exit(-1);
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <cstdlib>
+#include <packet/PacketBufferV.h>
+#include <packet/File.h>
+
+using namespace std;
+using namespace PacketLib;
+
+struct timespec start, stop;
+unsigned long totbytes = 0;
+
+double timediff(struct timespec stop, struct timespec start) {
+    double secs = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec) / (double)1000000000.0;
+    return secs;
+}
+
+void end(int ntimefilesize=1) {
+	clock_gettime( CLOCK_MONOTONIC, &stop);
+	double time = timediff(stop, start);
+	//std::cout << "Read " << ncycread << " ByteSeq: MB/s " << (float) (ncycread * Demo::ByteSeqSize / time) / 1048576 << std::endl;
+	cout << "Result: it took  " << time << " s" << endl;
+	if(totbytes != 0)
+		cout << "Result: rate: " << setprecision(10) << totbytes / 1000000 / time << " MiB/s" << endl;
+	exit(1);
+}
+
+int main(int argc, char *argv[]) {
+
+	if(argc != 5) {
+		cout << "client file.raw test(0/10) memcpy(0/1) waveformExtraction(0/1)" << endl;
+		cout << "where test is:" << endl;
+		cout << "0: check data model loading" << endl;
+		cout << "1: load data into a circular buffer" << endl;
+		cout << "2: decoding for routing (identification of the type of packet)" << endl;
+		cout << "3: decoding all the blocks of the packet" << endl;
+		exit(0);
 	}
 
-	//create & initialize sync semaphore
-	mutexsync = sem_open(SYNC_SEM_NAME, O_CREAT, 0644, 1);
-	if (mutexsync == SEM_FAILED) {
-		perror("unable to create semaphore");
-		sem_unlink(SYNC_SEM_NAME);
-		exit(-1);
+	// Parse command line
+	int test = atoi(argv[2]);
+	int ntimes = 0;
+	switch(test) {
+		case 0: {
+			cout << "Test 0: check data model loading" << endl;
+			break;
+		}
+		case 1: {
+			cout << "Test 1: check the loading of camera data packets" << endl;
+			break;
+		}
+		case 2: {
+			cout << "Test 2: decoding for routing (identification of the type of packet)" << endl;
+			ntimes = 1000;
+			break;
+		}
+		case 3: {
+			cout << "Test 3: access to a pointer of the camera data (all pixels) as a single block (method 1 packetlib)" << endl;
+			ntimes = 500;
+			break;
+		}
+		case 4: {
+			cout << "Test 4: packetlib access to an array of samples using packetlib to get the block" << endl;
+			ntimes = 50;
+			break;
+		}
+		case 5: {
+			cout << "Test 5: direct acces to an array of samples using packetlib to get the block" << endl;
+			ntimes = 2;
+			break;
+		}
+		case 6: {
+			cout << "Test 6: access to header and data field header with packetlib" << endl;
+			ntimes = 2;
+			break;
+		}
+		case 7: {
+			cout << "Test 7: decoding all the blocks of the packet (method 2 packetlib::bytestream builder)" << endl;
+			ntimes = 5000;
+			break;
+		}
+		case 8: {
+			cout << "Test 8: access to header, data field header and source data field (header)" << endl;
+			ntimes = 500;
+			break;
+		}
+		case 9: {
+			cout << "Test 9: access to some structural information form source data field (packetlib)" << endl;
+			ntimes = 10;
+			break;
+		}
+		case 10: {
+			cout << "Test 10: access to some values from source data field (packetlib)" << endl;
+			ntimes = 10;
+			break;
+		}
+		default:
+		{
+			cerr << "Wrong test number " << test << endl;
+			return 0;
+		}
 	}
 
-	//create the shared memory segment with this key
-	shmid = shmget(key, PACKETSZ, 0666);
+	// Load $CTARTA env variable
+	string ctarta;
+	const char* home = getenv("CTARTA");
+	if(!home) {
+		cerr << "ERROR: CTARTA environment variable is not defined." << endl;
+		return 0;
+	}
+	ctarta = home;
+
+	// Create a virtual memory from the shm (of key shmKey)
+	key_t key = shmKey;
+	int shmid = shmget(key, shmSize, 0666);
 	if (shmid < 0) {
-		perror("reader:failure in shmget");
-		exit(-1);
+		cerr << "Failure in shmget" << endl;
+		return 0;
+	}
+	unsigned char* shm = (unsigned char*) shmat(shmid, NULL, 0);
+	unsigned char* shmPtr = shm;
+
+	// Create semaphores
+	sem_t* full = sem_open(semFullName, O_CREAT, 0644, 0);
+	if (full == SEM_FAILED) {
+		cerr << "Unable to create full semaphore" << endl;
+		return 0;
+	}
+	sem_t* empty = sem_open(semEmptyName, O_CREAT, 0644, 1);
+	if (empty == SEM_FAILED) {
+		cerr << "Unable to create empty semaphore" << endl;
+		return 0;
 	}
 
-	//attach this segment to virtual memory
-	shm = (unsigned char*) shmat(shmid, NULL, 0);
+	bool activatememorycopy = atoi(argv[3]);
+	if(activatememorycopy)
+		cout << "Test  : memcpy activated..." << endl;
 
-	//lock sync mutex
-	sem_wait(mutexsync);
+	bool calcalg = atoi(argv[4]);
+	if(calcalg)
+		cout << "Test  : waveform extraction algorithm " << endl;
 
-	//unlock the client
-	*shm = '*';
+	// set test and calcalg value in the shm
+	*((int*)shmPtr) = test;
+	shmPtr += sizeof(int);
+	*((bool*)shmPtr) = activatememorycopy;
+	shmPtr += sizeof(bool);
+	*((bool*)shmPtr) = calcalg;
+	shmPtr += sizeof(bool);
 
-	//wait the first packet
-	printf("Waiting the client..\n");
-	fflush (stdout);
-	while (*shm == '*')
-		usleep(100000);
-	printf("Running..\n");
-	fflush(stdout);
-
-	//start reading
-	for (i = 0; i < NPACKETS; i++) {
-		//printf("Reading %d...\n", i); fflush(stdout);
-		sem_wait(mutex);
-		memcpy(vec, shm, PACKETSZ);
-		sem_post(mutex);
+	if(test == 0) {
+		clock_gettime( CLOCK_MONOTONIC, &start);
+		cout << "start Test 0 ..." << endl;
 	}
 
-	//unlock sync mutex
-	sem_post(mutexsync);
+	try {
+		if(test == 0)
+			end();
 
-	sem_close(mutex);
-	sem_close(mutexsync);
+		//check the size of the file
+		File f;
+		f.open(argv[1]);
+		f.close();
+
+		if(test == 1) {
+			clock_gettime(CLOCK_MONOTONIC, &start);
+			cout << "Start Test 1 ..." << endl;
+		}
+
+		string configFile = ctarta + "/share/rtatelem/rta_fadc1.stream";
+		PacketLib::PacketBufferV buff(ctarta + configFile, argv[1]);
+		buff.load();
+		int buffersize = buff.size();
+		cout << "Loaded " << buffersize << " packets " << endl;
+
+		if(test == 1) {
+			for(long i=0; i<buffersize; i++) {
+				ByteStreamPtr rawPacket = buff.getNext();
+				totbytes += rawPacket->size();
+			}
+			end();
+		}
+
+		cout << "Start Test " << test << " ... " << ntimes << " runs " << endl;
+		clock_gettime( CLOCK_MONOTONIC, &start);
+
+		dword* sizeShmPtr = (dword*)shmPtr;
+		byte* bufferShmPtr = (byte*)shmPtr+sizeof(dword);
+
+		for(int i=0; i<ntimes; i++) {
+			ByteStreamPtr rawPacket = buff.getNext();
+			dword size = rawPacket->size();
+
+			sem_wait(empty);
+			*sizeShmPtr = size;
+			memcpy(rawPacket->getStream(), bufferShmPtr, size);
+			sem_post(full);
+
+			totbytes += size;
+		}
+
+		end(ntimes);
+	}
+	catch(PacketException* e) {
+        cout << e->geterror() << endl;
+	}
+
+	sem_close(full);
+	sem_close(empty);
 	shmctl(shmid, IPC_RMID, 0);
 
 	return 0;
