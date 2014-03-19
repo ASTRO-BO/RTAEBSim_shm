@@ -217,11 +217,12 @@ int main(int argc, char *argv[]) {
 
 		for(int i=0; i<ntimes; i++) {
 			ByteStreamPtr rawPacket = buff.getNext();
+
 			dword size = rawPacket->size();
 
 			sem_wait(empty);
-			*sizeShmPtr = size;
-			memcpy(rawPacket->getStream(), bufferShmPtr, size);
+			*sizeShmPtr = size*sizeof(byte);
+			memcpy(bufferShmPtr, rawPacket->getStream(), size*sizeof(byte));
 			sem_post(full);
 
 			totbytes += size;
