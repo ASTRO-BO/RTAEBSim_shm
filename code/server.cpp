@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		string configFile = ctarta + "/share/rtatelem/rta_fadc1.stream";
-		PacketLib::PacketBufferV buff(ctarta + configFile, argv[1]);
+		PacketLib::PacketBufferV buff(configFile, argv[1]);
 		buff.load();
 		int buffersize = buff.size();
 		cout << "Loaded " << buffersize << " packets " << endl;
