@@ -448,8 +448,9 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 			}
-			sem_post(empty);
 		}
+
+		sem_post(empty);
 	}
 
 	//wait for the lock of sync mutex
