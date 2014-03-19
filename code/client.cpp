@@ -237,11 +237,11 @@ int main(int argc, char *argv[]) {
 		sem_wait(full);
 		ByteStreamPtr rawPacket = ByteStreamPtr(new ByteStream(bufferShmPtr, *sizeShmPtr, false));
 		RTATelem::CTAPacket& packet = decoder.getPacket(rawPacket);
-		RTATelem::CTACameraTriggerData1& trtel = (RTATelem::CTACameraTriggerData1&) packet;
 
 		enum RTATelem::CTAPacketType type = packet.getPacketType();
 		//cout << "Packet #" << npacketsread2 << " size: " << size << " byte. type: " << type << endl;
 		if(type == RTATelem::CTA_CAMERA_TRIGGERDATA_1) {
+			RTATelem::CTACameraTriggerData1& trtel = (RTATelem::CTACameraTriggerData1&) packet;
 
 			long npacketsread2;
 			if(firstLoop) {
