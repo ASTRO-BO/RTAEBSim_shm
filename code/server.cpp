@@ -15,6 +15,7 @@
  ***************************************************************************/
 
 #include "shm_common.h"
+#include "mac_clock_gettime.h"
 
 // shm
 #include <sys/ipc.h>
