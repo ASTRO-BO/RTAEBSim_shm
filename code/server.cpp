@@ -149,15 +149,15 @@ int main(int argc, char *argv[]) {
 	unsigned char* shm = (unsigned char*) shmat(shmid, NULL, 0);
 	unsigned char* shmPtr = shm;
 
-	// Create semaphores
-	sem_t* full = sem_open(semFullName, O_CREAT, 0644, 0);
+	// Open semaphores
+	sem_t* full = sem_open(semFullName, O_RDWR);
 	if (full == SEM_FAILED) {
-		cerr << "Unable to create full semaphore" << endl;
+		cerr << "Unable to access full semaphore" << endl;
 		return 0;
 	}
-	sem_t* empty = sem_open(semEmptyName, O_CREAT, 0644, 1);
+	sem_t* empty = sem_open(semEmptyName, O_RDWR);
 	if (empty == SEM_FAILED) {
-		cerr << "Unable to create empty semaphore" << endl;
+		cerr << "Unable to access empty semaphore" << endl;
 		return 0;
 	}
 

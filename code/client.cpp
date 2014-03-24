@@ -199,6 +199,10 @@ int main(int argc, char *argv[]) {
 	unsigned char* shm = (unsigned char*) shmat(shmid, NULL, 0);
 	unsigned char* shmPtr = shm;
 
+	// Destroy previous semaphores if exists
+	sem_unlink(semFullName);
+	sem_unlink(semEmptyName);
+
 	// Create semaphores
 	sem_t* full = sem_open(semFullName, O_CREAT, 0644, 0);
 	if (full == SEM_FAILED) {
